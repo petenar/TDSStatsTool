@@ -6,11 +6,14 @@ Created on Wed Nov 13 20:13:51 2024
 """
 import json
 # Loading data from JSON
+#container for comp data
 data = {}
+#container for non comp data
 data2 = {}
+#populate from json
 with open('tournament_data.json', 'r') as f:
     data = json.load(f)
-
+#populate from json
 with open('local_data.json', 'r') as f:
     data2 = json.load(f)
 
@@ -28,7 +31,9 @@ from tkinter import messagebox
 from tkinter import Toplevel
 import json
 
+#set url for comp results
 base_url = "https://digitalgateopen.com/tournament-results-overview"
+#set url for local results
 local_url = "https://digitalgateopen.com/local-results-overview"
 
 
@@ -37,11 +42,13 @@ try:
         data = json.load(f)
     with open('local_data.json', 'r') as f:
         data2 = json.load(f)
+#catch the error in case there is no data file present
 except FileNotFoundError:
     print("Data files not found. Please update the data.")
     data = {"formats": {}, "cards": {}}
     data2 = {"formats": {}, "cards": {}}
 
+#import our functions for updating card data
 from Webscraping import (get_format_links,get_local_format_links,get_tournaments_for_format,get_locals_for_format,
                          scrape_decklist,scrape_card_info,populate_decklists_and_card_data_for_all_formats,
                          populate_decklists_and_card_data_for_local_formats)
@@ -57,11 +64,14 @@ format_order = [
     "EX7: Digimon Liberator", "BT18-19: Special Booster Ver.2.0", "EX8: Chains of Liberation"
 ]
 
-
+#create a dataset with both competitive and locals data
 def aggregate_card_data(data, data2):
+    #define combined cards
     combined_cards = {}
 
+    #loop through every present card in data by reference code
     for ref_code, card_info in data["cards"].items():
+        #take the data at a a given reference code
         combined_cards[ref_code] = {
             "Color": card_info["Color"],
             "total_quantity": card_info["total_quantity"],
@@ -69,12 +79,15 @@ def aggregate_card_data(data, data2):
             "total_deck_representation": card_info.get("total_deck_representation", 0),  # Start with data values
             **{k: v for k, v in card_info.items() if k.endswith("_quantity") or k.endswith("_representation")},
         }
-
+    #loop through every present card in data2 by reference code
     for ref_code, card_info in data2["cards"].items():
+        #take the data at a given reference code
         if ref_code in combined_cards:
             # Add data2 values to existing data
             #combined_cards[ref_code]["total_quantity"] += card_info["total_quantity"]
             #combined_cards[ref_code]["total_deck_representation"] += card_info.get("total_deck_representation", 0)
+            #loop through each value in card info and sum the representation and quantity if it exists already
+            #if it does not exist create a new variable and add it 
             for key, value in card_info.items():
                 if key.endswith("_quantity") or key.endswith("_representation"):
                     combined_cards[ref_code][key] = combined_cards[ref_code].get(key, 0) + value
@@ -87,7 +100,7 @@ def aggregate_card_data(data, data2):
                 "total_deck_representation": card_info.get("total_deck_representation", 0),
                 **{k: v for k, v in card_info.items() if k.endswith("_quantity") or k.endswith("_representation")},
             }
-
+    #return the combined cards list
     return combined_cards
 
 
@@ -102,7 +115,9 @@ def get_top_25_cards(cards):
 
     # Format the top 25 cards for display
     top_25 = [
+        #format is reference code - name - quantity
         f"{card_ref}: {card_info['Name']} - {card_info['total_quantity']}"
+        #iterate through each card in sorted_cards list
         for card_ref, card_info in sorted_cards[:25]
     ]
 
@@ -119,7 +134,7 @@ def display_top_25_cards():
     for widget in avg_rep_frame.winfo_children():
         widget.destroy()
 
-    # Get user selections
+    # Get user selections for tournament type, format, card color, and type of card
     selected_tournament = tournament_type_var.get()
     selected_format = format_var.get()
     selected_color = color_var.get()
@@ -127,45 +142,56 @@ def display_top_25_cards():
 
     # Determine dataset
     if selected_tournament == "Regionals":
+        #load regionals dataset
         current_data = data
     elif selected_tournament == "Unofficial Tournaments":
+        #load locals dataset
         current_data = data2
     else:
+        #load the aggregate data
         current_data = {"cards": aggregate_card_data(data, data2)}
         
     #  **Debug: Print Selected Format**
     print(f"Selected Format: {selected_format}")
     
     # Apply filters for format
+    #declare filtered cards container
     filtered_cards = {}
-    
+
+    #if we have a specific format
     if selected_format != "All Events":
+        #determine what format qty and representation we care about
         format_quantity_key = selected_format.lower().replace(" ", "_") + "_quantity"
         format_representation_key = selected_format.lower().replace(" ", "_") + "_representation"
     
         # Get index of the selected format in format_order
         format_index = format_order.index(selected_format) if selected_format in format_order else len(format_order) - 1
-        valid_formats = format_order[: format_index + 1]  # ✅ Include up to and including selected format
-    
+        #include formats only up to and including the selected format
+        valid_formats = format_order[: format_index + 1]
+
+        #for each card in selected dataset
         for card_ref, card_info in current_data["cards"].items():
             total_quantity = 0
             total_representation = 0
     
             #  Sum all values up to and including the selected format
             for fmt in valid_formats:
+                #declare fmt qty and rep
                 fmt_quantity_key = fmt.lower().replace(" ", "_") + "_quantity"
                 fmt_representation_key = fmt.lower().replace(" ", "_") + "_representation"
-            
+
+                #add the values
                 quantity = card_info.get(fmt_quantity_key, 0)
                 representation = card_info.get(fmt_representation_key, 0)
 
+                #increment total quantity and rep
                 total_quantity += quantity
                 total_representation += representation
     
             # Compute average copies per deck
             avg_copies_per_deck = total_quantity / total_representation if total_representation > 0 else 0
     
-            #  Store in filtered_cards **if the card appears in at least one format**
+            #  Store in filtered_cards
             if total_quantity > 0:
                 filtered_cards[card_ref] = {
                     **card_info,
@@ -192,9 +218,9 @@ def display_top_25_cards():
         ref for ref, info in filtered_cards.items() if info["format_quantity"] > 0
     ]
     if selected_format_cards:
-        print(f"🎉 Cards from {selected_format} are present in filtered_cards!")
+        print(f" Cards from {selected_format} are present in filtered_cards")
     else:
-        print(f"❌ No cards from {selected_format} found after filtering!")
+        print(f" No cards from {selected_format} found after filtering")
     
 
     #  Sort cards by total quantity in the selected format
@@ -219,45 +245,50 @@ def display_top_25_cards():
 
 
     # Calculate average representation percentage for the new list
+    #create a new container
     avg_representation_cards = []
+    #for each item in our filtered_cards list
     for card_ref, card_info in filtered_cards.items():
         total_representation = 0
         total_decks_from_release = 0
-        release_format = card_ref.split("-")[0]  # Extract set prefix (e.g., "BT16")
+        #extract our set prefix (BT16)
+        release_format = card_ref.split("-")[0]
     
-        #  Sum all representation values **up to AND including the selected format**
+        #  Sum all representation values up to and including selected format
+        #for each format
         for format_name in format_order:
+            #create our list of representation keys
             format_representation_key = format_name.lower().replace(" ", "_") + "_representation"
     
-            # 🛑 If we reached the selected format, sum it too, then stop
+            # Stop if we reached the selected format, sum it too, then stop
             total_representation += card_info.get(format_representation_key, 0)
             if format_name == selected_format:
                 break
     
         #  Compute decks only up to the selected format
         if selected_tournament == "Regionals":
+            #run compute_total_decks with regionals set
             total_decks_from_release = compute_total_decks(data, from_format=release_format, up_to_format=selected_format)
         elif selected_tournament == "Unofficial Tournaments":
+            #run compute_total_decks with locals set
             total_decks_from_release = compute_total_decks(data2, from_format=release_format, up_to_format=selected_format)
         else:
+            #run compute_total_decks for both
             total_decks_from_release = (
                 compute_total_decks(data, from_format=release_format, up_to_format=selected_format) +
                 compute_total_decks(data2, from_format=release_format, up_to_format=selected_format)
             )
     
-        #  Debugging Output
-        print(f"📌 {card_ref} | Total Representation (Up to {selected_format}): {total_representation}")
-        print(f"📌 {card_ref} | Total Decks from Release (Up to {selected_format}): {total_decks_from_release}")
-    
         # Compute average representation %
         avg_representation_percentage = (
             total_representation / total_decks_from_release * 100 if total_decks_from_release > 0 else 0
         )
-    
+        #add the average rep % to each card
         avg_representation_cards.append((card_ref, card_info["Name"], avg_representation_percentage))
-    
+
+        #debug check for BT16 ukkomon
         if card_ref == "BT16-082":
-            print("✅ Debugging BT16-082:")
+            print(" Debugging BT16-082:")
             print("Decks:", total_decks_from_release)
             print("Decks Played in:", total_representation)
             print("Average Representation %:", avg_representation_percentage)
@@ -286,23 +317,28 @@ def display_top_25_cards():
         print("No cards found after filtering!")
         return
 
-
-
-
 # Function to update the format dropdown with all formats
 def populate_format_dropdown():
     # Populate with all unique formats from both datasets
     all_formats = set(data["formats"].keys()).union(set(data2["formats"].keys()))
-    formats = ["All Events"] + sorted(all_formats)  # Add "All Events" as the first option
+    #Make "All Events" the first option
+    formats = ["All Events"] + sorted(all_formats)
     format_dropdown["values"] = formats
-    format_dropdown.set("All Events")  # Default to "All Events"
+    #default to "All Events"
+    format_dropdown.set("All Events")
 
+#create our dropdown for pulling up data on specific card
 def populate_card_dropdown(filtered_cards):
-    global all_card_entries  # Keep a global reference to the full list of cards
+    #Keep global reference to card list
+    global all_card_entries
+    #create a list of all card entries for card we are searching for
     all_card_entries = [f"{ref_code}: {card_info['Name']}" for ref_code, card_info in filtered_cards.items()]
-    card_dropdown["values"] = sorted(all_card_entries)  # Populate the dropdown with sorted entries
-    card_var.set("")  # Clear previous selection
-    
+    #populate with sorted entries
+    card_dropdown["values"] = sorted(all_card_entries)
+    #clear previous selection
+    card_var.set("")
+
+#cleate our dropdown for event filtering
 def filter_card_dropdown(event):
     # Get the current input in the dropdown
     typed_text = card_var.get()
@@ -313,18 +349,25 @@ def filter_card_dropdown(event):
     # Update the dropdown values with the filtered list
     card_dropdown["values"] = filtered_entries
 
+#generate our image for selected card
 def generate_image_url(card_ref_code):
+    #define base url
     base_url = "https://digitalgateopen.com/images/cards/"
-    format_code = card_ref_code.split('-')[0]  # Extract the format code
+    #grab format code
+    format_code = card_ref_code.split('-')[0]
     return f"{base_url}{format_code}/{card_ref_code}.webp"
 
+#compute the total number of decks present
 def compute_total_decks(dataset, from_format=None, up_to_format=None):
+    #define total_decks
     total_decks = 0
+    #grab the format
     formats = dataset.get("formats", {})
+    #stop start flags
     format_started = False
     format_stopped = False
 
-
+    #go through format order until we get to desired formats
     for format_name in format_order:
         # Skip formats until we reach the starting format
         if from_format and not format_started:
@@ -337,24 +380,27 @@ def compute_total_decks(dataset, from_format=None, up_to_format=None):
         if up_to_format and format_name == up_to_format:
             format_stopped = True
 
-
-
         # Process decks in the current format
         format_data = formats.get(format_name, {})
         tournaments = format_data.get("tournaments", {})
 
-        if isinstance(tournaments, list):  # Handle list-based structure
+        #handle list
+        if isinstance(tournaments, list):
+            #for each tournament
             for tournament in tournaments:
+                #increment deck count
                 total_decks += len(tournament.get("decks", []))
-        elif isinstance(tournaments, dict):  # Handle dict-based structure
+        #handle dictionary
+        elif isinstance(tournaments, dict):
             for tournament in tournaments.values():
+                #increment deck count
                 total_decks += len(tournament.get("decks", []))
 
         # Stop if we reached up_to_format
         if format_stopped:
             break
 
-
+    #return the number of decks
     return total_decks
 
 
@@ -382,7 +428,7 @@ def display_card_statistics(card_ref_code):
     # Identify the release format based on the card reference code
     release_format = card_ref_code.split("-")[0]  # Extract prefix (e.g., `BT16`)
     
-    # Prepare stats
+    # Prepare stats and declare parameters
     stats = {
         "competitive": {
             "total_quantity": 0,
@@ -409,10 +455,12 @@ def display_card_statistics(card_ref_code):
         "casual": data2["cards"].get(card_ref_code, {}),
         "aggregate": aggregate_card_data(data, data2).get(card_ref_code, {}),
     }
-
+    #for each item
     for key, dataset in stats.items():
+        #take the card info from card_data
         card_info = card_data[key]
         dataset["total_quantity"] = card_info.get("total_quantity", 0)
+        #set our dataset to the sum of both if we are working with aggregate data
         if key == "aggregate":
             dataset["total_representation"] = (
                 card_data["competitive"].get("total_deck_representation", 0) +
@@ -459,6 +507,7 @@ def display_card_statistics(card_ref_code):
         else 0
     )
 
+    #format and display all our computed parameters
     stats_text = f"""
     Decks played in since release (Aggregate): {stats['aggregate']['total_representation']}
     Decks played since release (Aggregate): {stats['aggregate']['total_decks_from_release']}
@@ -493,11 +542,12 @@ def display_card_statistics(card_ref_code):
     stats_label = tk.Label(stats_display_frame, text=stats_text, font=("Arial", 10), justify="left", anchor="w")
     stats_label.pack(fill="x")
 
-
+#function for displaying desired card image
 def display_card_image(card_ref_code):
     # Generate the image URL
     image_url = generate_image_url(card_ref_code)
-    print(f"Generated Image URL: {image_url}")  # Debugging
+    #print debugging URL
+    print(f"Generated Image URL: {image_url}") 
 
     try:
         # Determine dataset based on selected tournament type and format
@@ -523,9 +573,11 @@ def display_card_image(card_ref_code):
 
             # Fetch the relevant quantity based on the selected format
             if selected_format != "All Events":
+                #grab format qty based on selected format
                 format_quantity_key = selected_format.lower().replace(" ", "_") + "_quantity"
                 quantity = card_info.get(format_quantity_key, 0)
             else:
+                #set qty to 0
                 quantity = card_info.get("total_quantity", 0)
 
             # Update the card info label
@@ -559,10 +611,12 @@ def display_card_image(card_ref_code):
         print(f"Error fetching card image: {e}")
     except Exception as e:
         print(f"Error displaying card image: {e}")
-        
+
+    #call function to show graphs and stats with card
     display_card_graphs(card_ref_code)
     display_card_statistics(card_ref_code)
 
+#function to create plot for usage over time
 def plot_card_usage_over_time(card_ref_code, dataset, graph_title, parent_frame):
     """
     Plots card usage over time from the specified dataset.
@@ -591,7 +645,9 @@ def plot_card_usage_over_time(card_ref_code, dataset, graph_title, parent_frame)
 
     # Prepare data for the graph
     usage_by_format = {}
+    #for each format
     for format_name in format_order:
+        #create format key and usage by format
         format_key = format_name.lower().replace(" ", "_") + "_quantity"
         usage_by_format[format_name] = card_info.get(format_key, 0)
 
@@ -606,7 +662,9 @@ def plot_card_usage_over_time(card_ref_code, dataset, graph_title, parent_frame)
             quantities.append(qty)
 
     # Create the graph
-    fig, ax = plt.subplots(figsize=(4, 3))  # Adjust size as needed
+    #create our subplot
+    fig, ax = plt.subplots(figsize=(4, 3))
+    #plot parameters
     ax.plot(formats, quantities, marker="o", linestyle="-", color="blue")
     ax.set_title(graph_title, fontsize=12)
     ax.set_xlabel("Formats", fontsize=10)
@@ -626,6 +684,7 @@ def plot_card_usage_over_time(card_ref_code, dataset, graph_title, parent_frame)
     canvas_widget.grid(row=0, column=0, padx=5, pady=5, sticky="nsew")
     canvas.draw()
 
+#plot our rep by format
 def plot_representation_by_format(card_ref_code, dataset, graph_title, parent_frame):
     """
     Plots deck representation by format from the specified dataset.
@@ -655,7 +714,7 @@ def plot_representation_by_format(card_ref_code, dataset, graph_title, parent_fr
     # Prepare data for the graph
     representation_by_format = {}
     for format_name in format_order:
-        # Generate the format-specific representation key
+        #Create the format-specific representation key
         format_key = format_name.lower().replace(" ", "_") + "_representation"
         representation_by_format[format_name] = card_info.get(format_key, 0)
 
@@ -663,6 +722,7 @@ def plot_representation_by_format(card_ref_code, dataset, graph_title, parent_fr
     formats = []
     representations = []
     non_zero_found = False
+    #iterate each fmt and rep pair in representation by format items list and append found items if > 0
     for fmt, rep in representation_by_format.items():
         if rep > 0 or non_zero_found:
             non_zero_found = True
@@ -670,7 +730,8 @@ def plot_representation_by_format(card_ref_code, dataset, graph_title, parent_fr
             representations.append(rep)
 
     # Create the graph
-    fig, ax = plt.subplots(figsize=(4, 3))  # Adjust size as needed
+    fig, ax = plt.subplots(figsize=(4, 3))
+    #declare parameters
     ax.bar(formats, representations, color="green")
     ax.set_title(graph_title, fontsize=12)
     ax.set_xlabel("Formats", fontsize=10)
@@ -690,7 +751,7 @@ def plot_representation_by_format(card_ref_code, dataset, graph_title, parent_fr
     canvas_widget.grid(row=0, column=0, padx=5, pady=5, sticky="nsew")
     canvas.draw()
 
-
+#function to display our graphs based on card reference code
 def display_card_graphs(card_ref_code):
     """
     Displays all graphs for the selected card: 2x2 grid of usage and representation
@@ -744,7 +805,7 @@ def display_card_graphs(card_ref_code):
         parent_frame=unofficial_percentage_graph_frame
     )
 
-# Modify `on_card_selected` to include graph plotting
+#display information when a card is selected from card dropdown
 def on_card_selected():
     # Get the selected card from the dropdown
     selected_card = card_var.get()
@@ -752,11 +813,13 @@ def on_card_selected():
     if selected_card:
         # Extract the card reference code (everything before the colon `:`)
         selected_ref_code = selected_card.split(":")[0].strip()
-        print(f"Selected Card Ref Code: {selected_ref_code}")  # Debugging
+        #debug to check selected card
+        print(f"Selected Card Ref Code: {selected_ref_code}") 
 
         # Use the aggregate dataset for fetching card info
         aggregated_data = aggregate_card_data(data, data2)
 
+        #if selected card is in aggregate data
         if selected_ref_code in aggregated_data:
             # Fetch card info from the aggregated data
             card_info = aggregated_data[selected_ref_code]
@@ -781,8 +844,10 @@ def on_card_selected():
                 graph_title="Average Copies per Deck (Competitive)",
                 parent_frame=avg_copies_graph_frame
             )           
-  
+            
+#plot our representation %
 def plot_representation_percentage(card_ref_code, dataset, graph_title, parent_frame):
+    #select our dataset
     if dataset == "regionals":
         selected_data = data
     elif dataset == "unofficial":
@@ -802,22 +867,30 @@ def plot_representation_percentage(card_ref_code, dataset, graph_title, parent_f
     # Prepare data for the graph
     percentage_by_format = {}
     total_decks_all_formats = 0
+    #create our representation key for each format
     for format_name in format_order:
         representation_key = format_name.lower().replace(" ", "_") + "_representation"
         representation = card_info.get(representation_key, 0)
 
         total_decks = 0
         format_key = format_name
+        #grab the tournaments for each selected format
         if format_key in selected_data["formats"]:
             tournaments = selected_data["formats"][format_key].get("tournaments", [])
             if isinstance(tournaments, list):
+                #sum the total decks
                 total_decks = sum(len(tournament.get("decks", [])) for tournament in tournaments)
             elif isinstance(tournaments, dict):
+                #sum the total decks
                 total_decks = sum(len(tournament.get("decks", [])) for tournament in tournaments.values())
-                
-        total_decks_all_formats += total_decks
-        #print(f"Format: {format_name}, Representation: {representation}, Total Decks: {total_decks}")
 
+        #increment all formats value with current total decks
+        total_decks_all_formats += total_decks
+
+        #debug statement
+        print(f"Format: {format_name}, Representation: {representation}, Total Decks: {total_decks}")
+
+        #turn decimal into %
         if total_decks > 0:
             percentage_by_format[format_name] = (representation / total_decks) * 100
         else:
@@ -827,19 +900,18 @@ def plot_representation_percentage(card_ref_code, dataset, graph_title, parent_f
     formats = []
     percentages = []
     non_zero_found = False
+    #for each fmt percent pair append the value 
     for fmt, perc in percentage_by_format.items():
         if perc > 0 or non_zero_found:
             non_zero_found = True
             formats.append(fmt)
             percentages.append(perc)
 
-   # print(f"Filtered Formats: {formats}")
-   # print(f"Filtered Percentages: {percentages}")
-
     if not formats or not percentages:
     #    print(f"No data to plot for card {card_ref_code} in dataset {dataset}")
         return
 
+    #plot our information and define graph parameters
     fig, ax = plt.subplots(figsize=(4, 3))
     ax.bar(formats, percentages, color="purple")
     ax.set_title(graph_title, fontsize=12)
@@ -857,7 +929,8 @@ def plot_representation_percentage(card_ref_code, dataset, graph_title, parent_f
     canvas_widget = canvas.get_tk_widget()
     canvas_widget.grid(row=0, column=0, padx=5, pady=5, sticky="nsew")
     canvas.draw()
-  
+
+#plot the average copies per deck
 def plot_average_copies_per_deck(card_ref_code, dataset, graph_title, parent_frame):
     """
     Plots the average copies per deck for a card in competitive events.
@@ -886,6 +959,7 @@ def plot_average_copies_per_deck(card_ref_code, dataset, graph_title, parent_fra
     usage_by_format = {}
     representation_by_format = {}
 
+    #for each format
     for format_name in format_order:
         # Get the quantity of the card in the format
         quantity_key = format_name.lower().replace(" ", "_") + "_quantity"
@@ -901,7 +975,7 @@ def plot_average_copies_per_deck(card_ref_code, dataset, graph_title, parent_fra
         for fmt in format_order
     ]
 
-    # Debugging outputs
+    # Debugging statements
     print("Debugging: Usage by Format:", usage_by_format)
     print("Debugging: Representation by Format:", representation_by_format)
     print("Debugging: Average Copies per Deck:", average_copies_per_deck)
@@ -910,6 +984,7 @@ def plot_average_copies_per_deck(card_ref_code, dataset, graph_title, parent_fra
     formats = []
     averages = []
     non_zero_found = False
+    #for each format avg pair append values
     for fmt, avg in zip(format_order, average_copies_per_deck):
         if avg > 0 or non_zero_found:
             non_zero_found = True
@@ -947,9 +1022,10 @@ root = tk.Tk()
 root.title("TDS Stats Tool")
 root.geometry("1800x1000")  # Wider window
 
+#handle donation button clicked
 def open_donation_link():
     """Opens the PayPal donation link in the user's default web browser."""
-    donation_url = "https://www.paypal.com/donate/?business=SFNMDRWRLCGKG&no_recurring=0&currency_code=USD"  # Replace with your PayPal link
+    donation_url = "https://www.paypal.com/donate/?business=SFNMDRWRLCGKG&no_recurring=0&currency_code=USD"
     webbrowser.open(donation_url)
 
 # Add a "Donate" button to the UI
@@ -962,6 +1038,7 @@ donate_button = tk.Button(
     command=open_donation_link
 )
 
+#update data function
 def update_data():
     """
     Updates the local and tournament data by running the scraper.
@@ -1075,7 +1152,6 @@ card_var = tk.StringVar()
 card_dropdown = ttk.Combobox(dropdown_frame, textvariable=card_var, state="normal")
 card_dropdown.pack(side="left", padx=10)
 
-
 # Main frame to hold the left and right sections
 main_frame = tk.Frame(root)
 main_frame.pack(fill="both", expand=True)
@@ -1087,7 +1163,6 @@ avg_rep_frame.pack(side="left", padx=10, pady=20, fill="y", expand=True)
 # Frame for displaying text (left side)
 card_display_frame = tk.Frame(main_frame)
 card_display_frame.pack(side="left", padx=10, pady=20, fill="y", expand=True)
-
 
 # Frame for displaying the image (right side)
 card_image_frame = tk.Frame(main_frame)
@@ -1123,7 +1198,7 @@ avg_copies_graph_frame.grid(row=3, column=0, columnspan=2, padx=5, pady=5, stick
 # Configure row and column weights for graph_frame
 graph_frame.rowconfigure(0, weight=1)
 graph_frame.rowconfigure(1, weight=1)
-graph_frame.rowconfigure(2, weight=1)  # Add weight for the third row
+graph_frame.rowconfigure(2, weight=1)
 graph_frame.columnconfigure(0, weight=1)
 graph_frame.columnconfigure(1, weight=1)
 
@@ -1140,7 +1215,7 @@ stats_display_frame = tk.Frame(card_content_frame)
 stats_display_frame.pack(pady=10)
 
 
-# Bindings
+# Bindings for dropdown actions
 color_dropdown.bind("<<ComboboxSelected>>", lambda event: display_top_25_cards())
 tournament_type_dropdown.bind("<<ComboboxSelected>>", lambda event: display_top_25_cards())
 format_dropdown.bind("<<ComboboxSelected>>", lambda event: display_top_25_cards())
@@ -1151,7 +1226,7 @@ type_dropdown.bind("<<ComboboxSelected>>", lambda event: display_top_25_cards())
 # Populate format dropdown and initialize display
 populate_format_dropdown()
 
-# Initialize the display with the top 25 most used cards (All)
+# Initialize the display with the top 25 most used cards
 top_25_cards, most_used_card_ref = get_top_25_cards(aggregate_card_data(data, data2))
 display_top_25_cards()
 
@@ -1171,7 +1246,8 @@ if most_used_card_ref:
         graph_title="Average Copies per Deck (Competitive)",
         parent_frame=avg_copies_graph_frame
     )
-    
+
+#compute our statistics
 def compute_card_statistics(card_ref_code, dataset):
     """Compute and print statistics for a given card."""
     
@@ -1234,12 +1310,14 @@ def compute_card_statistics(card_ref_code, dataset):
 
 # Example usage
 #compute_card_statistics("BT16-082", "unofficial")
-total_comp = compute_total_decks(data,from_format='BT16')
-print(str(total_comp))
-total_casual = compute_total_decks(data2,from_format='BT16')
-print(str(total_casual))
-aggregate = compute_total_decks(data,from_format='BT16') + compute_total_decks(data2,from_format='BT16')
-print(str(aggregate))
+#total_comp = compute_total_decks(data,from_format='BT16')
+#print(str(total_comp))
+#total_casual = compute_total_decks(data2,from_format='BT16')
+#print(str(total_casual))
+#aggregate = compute_total_decks(data,from_format='BT16') + compute_total_decks(data2,from_format='BT16')
+#print(str(aggregate))
+
+
 # Run the UI
 root.mainloop()
 
